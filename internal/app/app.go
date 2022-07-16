@@ -2,83 +2,74 @@ package app
 
 import (
 	"io"
-	"math/rand"
 	"net/http"
-	"strings"
+	"os"
 
-	"github.com/recoilme/slowpoke"
+	"github.com/gorilla/mux"
 )
 
-var file = "db/data.db"
+var Port = "8080"
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
-	if path := r.URL.Path; r.Method == http.MethodPost && path == "/" {
-		CreateLinkHandler(w, r)
-	} else if r.Method == http.MethodGet && len(strings.Trim(path, "/")) == 7 {
-		GetLinkHandler(w, r)
-	} else {
-		w.WriteHeader(http.StatusBadRequest)
-	}
+type Shortener interface {
+	Shorting(url string) string
+	GetFullURL(hash string) (string, error)
 }
 
-func CreateLinkHandler(w http.ResponseWriter, r *http.Request) {
+type app struct {
+	r       *mux.Router
+	service Shortener
+}
+
+func New(service Shortener) *app {
+	r := mux.NewRouter()
+
+	return &app{service: service, r: r}
+}
+
+func (a *app) handleShortingURL(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if len(body) == 0 {
+	if len(body) == 0 || r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	url := string(body)
+	hash := a.service.Shorting(url)
+
 	w.WriteHeader(http.StatusCreated)
-	hash := shorting()
-	for CheckKey([]byte(hash)) {
-		hash = shorting()
-	}
-	SaveToDB(hash, string(body))
-	_, err = w.Write([]byte("http://localhost:8080/" + hash))
+	_, err = w.Write([]byte("http://localhost:" + Port + "/" + hash))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
-func GetLinkHandler(w http.ResponseWriter, r *http.Request) {
-	hash := strings.Trim(r.URL.Path, "/")
-	url, err := GetFromDB(hash)
+func (a *app) handleGetFullURL(w http.ResponseWriter, r *http.Request) {
+	hash := mux.Vars(r)["hash"]
+	if len(hash) != 7 || r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	url, err := a.service.GetFullURL(hash)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func CheckKey(key []byte) bool {
-	_, err := slowpoke.Get(file, key)
-	return err == nil
-}
-
-func SaveToDB(hash, url string) {
-	k := []byte(hash)
-	v := []byte(url)
-
-	if !CheckKey(k) {
-		slowpoke.Set(file, k, v)
+func (a *app) Run() error {
+	if len(os.Args) > 1 {
+		Port = os.Args[1]
 	}
-}
-
-func GetFromDB(hash string) (string, error) {
-	k := []byte(hash)
-	url, err := slowpoke.Get(file, k)
-	return string(url), err
-}
-
-func shorting() string {
-	b := make([]byte, 7)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
+	a.r.HandleFunc("/", a.handleShortingURL)
+	a.r.HandleFunc("/{hash}", a.handleGetFullURL)
+	return http.ListenAndServe(":"+Port, a.r)
 }
