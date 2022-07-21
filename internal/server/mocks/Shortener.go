@@ -30,8 +30,8 @@ func (_m *Shortener) GetFullURL(hash string) (string, error) {
 	return r0, r1
 }
 
-// Shorting provides a mock function with given fields: url
-func (_m *Shortener) Shorting(url string) string {
+// ShortingURL provides a mock function with given fields: url
+func (_m *Shortener) ShortingURL(url string) string {
 	ret := _m.Called(url)
 
 	var r0 string

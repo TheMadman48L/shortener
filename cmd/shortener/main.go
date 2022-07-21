@@ -3,18 +3,15 @@ package main
 import (
 	"log"
 
-	"github.com/TheMadman48L/shortener/internal/app"
-	"github.com/TheMadman48L/shortener/internal/repo"
-	"github.com/TheMadman48L/shortener/internal/service"
+	"github.com/TheMadman48L/shortener/internal/server"
+	"github.com/TheMadman48L/shortener/internal/shortener"
+	"github.com/TheMadman48L/shortener/internal/storage"
 )
 
 func main() {
-	rep, err := repo.New(&repo.Options{Env: "dev"})
-	if err != nil {
-		log.Fatalln(err)
-	}
+	store := storage.NewSlowpokeStore()
+	shorten := shortener.NewShortener(store)
+	serv := server.NewServer(shorten)
 
-	serv := service.New(rep)
-	myapp := app.New(serv)
-	log.Fatalln(myapp.Run())
+	log.Fatalln(serv.Run())
 }

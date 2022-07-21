@@ -1,4 +1,4 @@
-package app
+package server
 
 import (
 	"io/ioutil"
@@ -7,15 +7,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TheMadman48L/shortener/internal/app/mocks"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TheMadman48L/shortener/internal/server/mocks"
 )
 
-func Test_app_handleShortingURL(t *testing.T) {
+func Test_server_handleShortingURL(t *testing.T) {
 	type fields struct {
 		r       *mux.Router
-		service *mocks.Shortener
+		shorten *mocks.Shortener
 	}
 	type args struct {
 		value string
@@ -36,7 +37,7 @@ func Test_app_handleShortingURL(t *testing.T) {
 			name: "OK",
 			fields: fields{
 				r:       mux.NewRouter(),
-				service: &mocks.Shortener{},
+				shorten: &mocks.Shortener{},
 			},
 			args: args{
 				value: "ya.ru",
@@ -53,18 +54,18 @@ func Test_app_handleShortingURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.want.callService {
-				tt.fields.service.On("Shorting", tt.args.value).Return(tt.want.hash)
+				tt.fields.shorten.On("ShortingURL", tt.args.value).Return(tt.want.hash)
 			}
 
-			a := &app{
+			serv := &server{
 				r:       tt.fields.r,
-				service: tt.fields.service,
+				shorten: tt.fields.shorten,
 			}
 			bodyReader := strings.NewReader(tt.args.value)
 			request := httptest.NewRequest(http.MethodPost, "http://localhost:8080", bodyReader)
 			w := httptest.NewRecorder()
 
-			h := http.HandlerFunc(a.handleShortingURL)
+			h := http.HandlerFunc(serv.handleShortingURL)
 			h.ServeHTTP(w, request)
 			res := w.Result()
 			defer res.Body.Close()
@@ -80,8 +81,8 @@ func Test_app_handleShortingURL(t *testing.T) {
 			}
 
 			if tt.want.callService {
-				tt.fields.service.AssertCalled(t, "Shorting", tt.args.value)
-				tt.fields.service.AssertNumberOfCalls(t, "Shorting", 1)
+				tt.fields.shorten.AssertCalled(t, "ShortingURL", tt.args.value)
+				tt.fields.shorten.AssertNumberOfCalls(t, "ShortingURL", 1)
 			}
 		})
 	}
