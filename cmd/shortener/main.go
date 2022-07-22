@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	store := storage.NewSlowpokeStore()
-	shorten := shortener.NewShortener(store)
+	store := storage.NewSlowpokeStore("db/data.db")
+	shorten := shortener.NewShortener(store, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	serv := server.NewServer(shorten)
 
 	log.Fatalln(serv.Run())

@@ -4,31 +4,32 @@ import (
 	"math/rand"
 )
 
-type Storage interface {
+type Storager interface {
 	Get(hash string) (string, error)
 	Set(hash, url string) error
 }
 
-type shortener struct {
-	store Storage
+type shortService struct {
+	store   Storager
+	symbols string
 }
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-func NewShortener(store Storage) *shortener {
-	return &shortener{store: store}
+func NewShortener(store Storager, symbols string) *shortService {
+	return &shortService{store: store, symbols: symbols}
 }
 
-func (s *shortener) ShortingURL(url string) string {
+func (s *shortService) ShortingURL(url string) string {
 	hash := s.getHash()
-	for s.checkKey(hash) {
+	_, err := s.store.Get(hash)
+	for err == nil {
 		hash = s.getHash()
+		_, err = s.store.Get(hash)
 	}
 	s.store.Set(hash, url)
 	return hash
 }
 
-func (s *shortener) GetFullURL(hash string) (string, error) {
+func (s *shortService) GetFullURL(hash string) (string, error) {
 	url, err := s.store.Get(hash)
 	if err != nil {
 		return url, err
@@ -36,15 +37,10 @@ func (s *shortener) GetFullURL(hash string) (string, error) {
 	return url, nil
 }
 
-func (s *shortener) getHash() string {
+func (s *shortService) getHash() string {
 	b := make([]byte, 7)
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		b[i] = s.symbols[rand.Intn(len(s.symbols))]
 	}
 	return string(b)
-}
-
-func (s *shortener) checkKey(hash string) bool {
-	_, err := s.store.Get(hash)
-	return err == nil
 }
