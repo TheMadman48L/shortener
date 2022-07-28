@@ -25,18 +25,21 @@ var port = "8080"
 var ErrEmptyBody = errors.New("empty body")
 var ErrHashLen = errors.New("hash must be 7 letters")
 
-func NewServer(s Shortener) *server {
-	r := mux.NewRouter()
-	return &server{shorten: s, r: r}
+func NewServer(shorten Shortener) *server {
+	s := &server{
+		r:       mux.NewRouter(),
+		shorten: shorten,
+	}
+	s.r.HandleFunc("/", s.handleShortingURL).Methods("POST")
+	s.r.HandleFunc("/{hash}", s.handleGetFullURL).Methods("GET")
+	s.r.HandleFunc("/", s.handleBadRequest)
+	return s
 }
 
 func (s *server) Run() error {
 	if len(os.Args) > 1 {
 		port = os.Args[1]
 	}
-	s.r.HandleFunc("/", s.handleShortingURL).Methods("POST")
-	s.r.HandleFunc("/{hash}", s.handleGetFullURL).Methods("GET")
-	s.r.HandleFunc("/", s.handleBadRequest)
 	return http.ListenAndServe(":"+port, s.r)
 }
 
